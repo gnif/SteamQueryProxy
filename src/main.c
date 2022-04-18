@@ -56,11 +56,11 @@ Cache a2sRules  = { 0 };
 
 struct pseudo_header
 {
-	u_int32_t source_address;
-	u_int32_t dest_address;
-	u_int8_t placeholder;
-	u_int8_t protocol;
-	u_int16_t udp_length;
+  u_int32_t source_address;
+  u_int32_t dest_address;
+  u_int8_t placeholder;
+  u_int8_t protocol;
+  u_int16_t udp_length;
 };
 
 uint16_t csum(void *buf, int cb)
@@ -327,44 +327,44 @@ static bool parse_payload(void * payload, uint16_t len)
 
 static void nfq_send_verdict(int queue_num, uint32_t id, int verdict)
 {
-	char buf[MNL_SOCKET_BUFFER_SIZE];
-	struct nlmsghdr *nlh;
+  char buf[MNL_SOCKET_BUFFER_SIZE];
+  struct nlmsghdr *nlh;
 
-	nlh = nfq_nlmsg_put(buf, NFQNL_MSG_VERDICT, queue_num);
-	nfq_nlmsg_verdict_put(nlh, id, verdict);
+  nlh = nfq_nlmsg_put(buf, NFQNL_MSG_VERDICT, queue_num);
+  nfq_nlmsg_verdict_put(nlh, id, verdict);
 
-	if (mnl_socket_sendto(nl, nlh, nlh->nlmsg_len) < 0)
+  if (mnl_socket_sendto(nl, nlh, nlh->nlmsg_len) < 0)
   {
-		perror("mnl_socket_send");
-		exit(EXIT_FAILURE);
-	}
+    perror("mnl_socket_send");
+    exit(EXIT_FAILURE);
+  }
 }
 
 static int queue_cb(const struct nlmsghdr *nlh, void *data)
 {
-	struct nlattr *attr[NFQA_MAX+1] = {};
-	if (nfq_nlmsg_parse(nlh, attr) < 0)
+  struct nlattr *attr[NFQA_MAX+1] = {};
+  if (nfq_nlmsg_parse(nlh, attr) < 0)
   {
-		perror("problems parsing");
-		return MNL_CB_ERROR;
-	}
+    perror("problems parsing");
+    return MNL_CB_ERROR;
+  }
 
-	struct nfgenmsg *nfg = mnl_nlmsg_get_payload(nlh);
-	if (attr[NFQA_PACKET_HDR] == NULL)
+  struct nfgenmsg *nfg = mnl_nlmsg_get_payload(nlh);
+  if (attr[NFQA_PACKET_HDR] == NULL)
   {
-		fputs("metaheader not set\n", stderr);
-		return MNL_CB_ERROR;
-	}
+    fputs("metaheader not set\n", stderr);
+    return MNL_CB_ERROR;
+  }
 
-	struct nfqnl_msg_packet_hdr * ph = mnl_attr_get_payload(attr[NFQA_PACKET_HDR]);
+  struct nfqnl_msg_packet_hdr * ph = mnl_attr_get_payload(attr[NFQA_PACKET_HDR]);
   uint32_t id = ntohl(ph->packet_id);
 
-	uint16_t plen    = mnl_attr_get_payload_len(attr[NFQA_PAYLOAD]);
-	void *   payload = mnl_attr_get_payload(attr[NFQA_PAYLOAD]);
+  uint16_t plen    = mnl_attr_get_payload_len(attr[NFQA_PAYLOAD]);
+  void *   payload = mnl_attr_get_payload(attr[NFQA_PAYLOAD]);
   int      verdict = parse_payload(payload, plen) ? NF_ACCEPT : NF_DROP;
 
-	nfq_send_verdict(ntohs(nfg->res_id), id, verdict);
-	return MNL_CB_OK;
+  nfq_send_verdict(ntohs(nfg->res_id), id, verdict);
+  return MNL_CB_OK;
 }
 
 int msleep(long msec)
@@ -524,19 +524,19 @@ loop:
 
 int main(int argc, char *argv[])
 {
-	char *buf;
-	/* largest possible packet payload, plus netlink data overhead: */
-	size_t sizeof_buf = 0xffff + (MNL_SOCKET_BUFFER_SIZE/2);
-	struct nlmsghdr *nlh;
-	int ret;
-	unsigned int portid, queue_num;
+  char *buf;
+  /* largest possible packet payload, plus netlink data overhead: */
+  size_t sizeof_buf = 0xffff + (MNL_SOCKET_BUFFER_SIZE/2);
+  struct nlmsghdr *nlh;
+  int ret;
+  unsigned int portid, queue_num;
 
-	if (argc != 3)
+  if (argc != 3)
   {
-		printf("Usage: %s [queue_num] [query_port]\n", argv[0]);
-		exit(EXIT_FAILURE);
-	}
-	queue_num   = atoi(argv[1]);
+    printf("Usage: %s [queue_num] [query_port]\n", argv[0]);
+    exit(EXIT_FAILURE);
+  }
+  queue_num   = atoi(argv[1]);
   g_queryPort = atoi(argv[2]);
 
   if (g_queryPort < 1 || g_queryPort > 65535)
@@ -545,54 +545,54 @@ int main(int argc, char *argv[])
     exit(EXIT_FAILURE);
   }
 
-	nl = mnl_socket_open(NETLINK_NETFILTER);
-	if (nl == NULL)
+  nl = mnl_socket_open(NETLINK_NETFILTER);
+  if (nl == NULL)
   {
-		perror("mnl_socket_open");
-		exit(EXIT_FAILURE);
-	}
+    perror("mnl_socket_open");
+    exit(EXIT_FAILURE);
+  }
 
-	if (mnl_socket_bind(nl, 0, MNL_SOCKET_AUTOPID) < 0)
+  if (mnl_socket_bind(nl, 0, MNL_SOCKET_AUTOPID) < 0)
   {
-		perror("mnl_socket_bind");
-		exit(EXIT_FAILURE);
-	}
-	portid = mnl_socket_get_portid(nl);
+    perror("mnl_socket_bind");
+    exit(EXIT_FAILURE);
+  }
+  portid = mnl_socket_get_portid(nl);
 
-	buf = malloc(sizeof_buf);
-	if (!buf)
+  buf = malloc(sizeof_buf);
+  if (!buf)
   {
-		perror("allocate receive buffer");
-		exit(EXIT_FAILURE);
-	}
+    perror("allocate receive buffer");
+    exit(EXIT_FAILURE);
+  }
 
-	nlh = nfq_nlmsg_put(buf, NFQNL_MSG_CONFIG, queue_num);
-	nfq_nlmsg_cfg_put_cmd(nlh, AF_INET, NFQNL_CFG_CMD_BIND);
+  nlh = nfq_nlmsg_put(buf, NFQNL_MSG_CONFIG, queue_num);
+  nfq_nlmsg_cfg_put_cmd(nlh, AF_INET, NFQNL_CFG_CMD_BIND);
 
-	if (mnl_socket_sendto(nl, nlh, nlh->nlmsg_len) < 0)
+  if (mnl_socket_sendto(nl, nlh, nlh->nlmsg_len) < 0)
   {
-		perror("mnl_socket_send");
-		exit(EXIT_FAILURE);
-	}
+    perror("mnl_socket_send");
+    exit(EXIT_FAILURE);
+  }
 
-	nlh = nfq_nlmsg_put(buf, NFQNL_MSG_CONFIG, queue_num);
-	nfq_nlmsg_cfg_put_params(nlh, NFQNL_COPY_PACKET, 0xffff);
+  nlh = nfq_nlmsg_put(buf, NFQNL_MSG_CONFIG, queue_num);
+  nfq_nlmsg_cfg_put_params(nlh, NFQNL_COPY_PACKET, 0xffff);
 
-	mnl_attr_put_u32(nlh, NFQA_CFG_FLAGS, htonl(NFQA_CFG_F_GSO));
-	mnl_attr_put_u32(nlh, NFQA_CFG_MASK, htonl(NFQA_CFG_F_GSO));
+  mnl_attr_put_u32(nlh, NFQA_CFG_FLAGS, htonl(NFQA_CFG_F_GSO));
+  mnl_attr_put_u32(nlh, NFQA_CFG_MASK, htonl(NFQA_CFG_F_GSO));
 
-	if (mnl_socket_sendto(nl, nlh, nlh->nlmsg_len) < 0)
+  if (mnl_socket_sendto(nl, nlh, nlh->nlmsg_len) < 0)
   {
-		perror("mnl_socket_send");
-		exit(EXIT_FAILURE);
-	}
+    perror("mnl_socket_send");
+    exit(EXIT_FAILURE);
+  }
 
-	/* ENOBUFS is signalled to userspace when packets were lost
-	 * on kernel side.  In most cases, userspace isn't interested
-	 * in this information, so turn it off.
-	 */
-	ret = 1;
-	mnl_socket_setsockopt(nl, NETLINK_NO_ENOBUFS, &ret, sizeof(int));
+  /* ENOBUFS is signalled to userspace when packets were lost
+   * on kernel side.  In most cases, userspace isn't interested
+   * in this information, so turn it off.
+   */
+  ret = 1;
+  mnl_socket_setsockopt(nl, NETLINK_NO_ENOBUFS, &ret, sizeof(int));
 
   g_socket = socket(AF_INET, SOCK_RAW, IPPROTO_RAW);
 
@@ -607,26 +607,26 @@ int main(int argc, char *argv[])
   while(!a2sInfo.len || !a2sPlayer.len || !a2sRules.len)
     msleep(200);
 
-	for (;;)
+  for (;;)
   {
-		ret = mnl_socket_recvfrom(nl, buf, sizeof_buf);
-		if (ret == -1)
+    ret = mnl_socket_recvfrom(nl, buf, sizeof_buf);
+    if (ret == -1)
     {
-			perror("mnl_socket_recvfrom");
-			exit(EXIT_FAILURE);
-		}
+      perror("mnl_socket_recvfrom");
+      exit(EXIT_FAILURE);
+    }
 
-		ret = mnl_cb_run(buf, ret, 0, portid, queue_cb, NULL);
-		if (ret < 0)
+    ret = mnl_cb_run(buf, ret, 0, portid, queue_cb, NULL);
+    if (ret < 0)
     {
-			perror("mnl_cb_run");
-			exit(EXIT_FAILURE);
-		}
-	}
+      perror("mnl_cb_run");
+      exit(EXIT_FAILURE);
+    }
+  }
 
   pthread_join(qt, NULL);
   close(g_socket);
-	mnl_socket_close(nl);
+  mnl_socket_close(nl);
 
-	return 0;
+  return 0;
 }
