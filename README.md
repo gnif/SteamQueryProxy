@@ -71,7 +71,7 @@ Add a iptables nfqueue target that processes every incoming packet for the query
 port (usually 27015), I recommend using the following rule which will fail safe
 even if this application is not running:
 
-    iptables -I INPUT 1 -p udp --dport 27015 -j NFQUEUE --queue-bypass --queue-num 0
+    iptables -A INPUT -p udp -m udp --dport 27015 -m length --length 33:57 -j NFQUEUE --queue-num 0 --queue-bypass
 
 After this has been done simply start SteamQueryProxy for the correct queue on
 the game port, for example:
