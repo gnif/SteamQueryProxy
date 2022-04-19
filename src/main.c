@@ -544,9 +544,11 @@ loop:
 
 int main(int argc, char *argv[])
 {
-  char *buf;
   /* largest possible packet payload, plus netlink data overhead: */
-  size_t sizeof_buf = 0xffff + (MNL_SOCKET_BUFFER_SIZE/2);
+  const size_t sizeof_buf = 0xffff + (MNL_SOCKET_BUFFER_SIZE / 2);
+  char buf[sizeof_buf];
+  memset(buf, 0, sizeof_buf);
+
   struct nlmsghdr *nlh;
   int ret;
   unsigned int portid, queue_num;
@@ -578,13 +580,6 @@ int main(int argc, char *argv[])
     exit(EXIT_FAILURE);
   }
   portid = mnl_socket_get_portid(nl);
-
-  buf = malloc(sizeof_buf);
-  if (!buf)
-  {
-    perror("allocate receive buffer");
-    exit(EXIT_FAILURE);
-  }
 
   nlh = nfq_nlmsg_put(buf, NFQNL_MSG_CONFIG, queue_num);
   nfq_nlmsg_cfg_put_cmd(nlh, AF_INET, NFQNL_CFG_CMD_BIND);
