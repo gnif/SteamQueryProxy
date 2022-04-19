@@ -19,6 +19,7 @@
 #include <netinet/ip.h>
 #include <netinet/udp.h>
 
+static bool                g_verbose = true;
 static int                 g_queryPort;
 static struct mnl_socket * nl;
 static int                 g_socket;
@@ -231,7 +232,6 @@ static bool parse_payload(void * payload, uint16_t len)
         return false;
       }
 
-      printf("A2S_INFO 0x%08x\n", *challenge);
       LOCK(dataLock);
       sendPacket(
         iph->saddr,
@@ -241,6 +241,10 @@ static bool parse_payload(void * payload, uint16_t len)
         a2sInfo.data,
         a2sInfo.len);
       UNLOCK(dataLock);
+
+      if (g_verbose)
+        printf("A2S_INFO 0x%08x\n", *challenge);
+
       return false;
     }
 
@@ -259,7 +263,6 @@ static bool parse_payload(void * payload, uint16_t len)
         return false;
       }
 
-      printf("A2S_PLAYER 0x%08x\n", *challenge);
       LOCK(dataLock);
       sendPacket(
         iph->saddr,
@@ -269,6 +272,10 @@ static bool parse_payload(void * payload, uint16_t len)
         a2sPlayer.data,
         a2sPlayer.len);
       UNLOCK(dataLock);
+
+      if (g_verbose)
+        printf("A2S_PLAYER 0x%08x\n", *challenge);
+
       return false;
     }
 
@@ -287,7 +294,6 @@ static bool parse_payload(void * payload, uint16_t len)
         return false;
       }
 
-      printf("A2S_RULES 0x%08x\n", *challenge);
       LOCK(dataLock);
       sendPacket(
         iph->saddr,
@@ -297,12 +303,15 @@ static bool parse_payload(void * payload, uint16_t len)
         a2sRules.data,
         a2sRules.len);
       UNLOCK(dataLock);
+
+      if (g_verbose)
+        printf("A2S_RULES 0x%08x\n", *challenge);
+
       return false;
     }
 
     case A2A_PING:
     {
-      printf("A2A_PING\n");
       sendPacket(
         iph->saddr,
         iph->daddr,
@@ -310,13 +319,20 @@ static bool parse_payload(void * payload, uint16_t len)
         udp->dest,
         "\xFF\xFF\xFF\xFF\x6A" "00000000000000\0",
         20);
+
+      if (g_verbose)
+        printf("A2A_PING\n");
+
       return false;
     }
 
     case A2S_SERVERQUERY_GETCHALLENGE:
     {
-      printf("A2S_SERVERQUERY_GETCHALLENGE\n");
       sendChallenge(iph, udp);
+
+      if (g_verbose)
+        printf("A2S_SERVERQUERY_GETCHALLENGE\n");
+
       return false;
     }
   }
