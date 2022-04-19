@@ -217,7 +217,7 @@ static void sendChallenge(struct iphdr * iph, struct udphdr * udp)
 
 static bool parse_payload(void * payload, uint16_t len)
 {
-  if (len < sizeof(struct iphdr) + sizeof(struct udphdr))
+  if (len < sizeof(struct iphdr) + sizeof(struct udphdr) || len > 57)
     return true;
 
   struct iphdr * iph = (struct iphdr *)payload;
