@@ -24,8 +24,10 @@ static struct mnl_socket * nl;
 static int                 g_socket;
 
 // retain 60s worth of challenges
-static uint32_t g_challenges[6] = { 0 };
-static uint32_t g_challengeIndex = -1;
+static uint32_t  g_challenges[6]  = { 0 };
+static int       g_challengeIndex = 0;
+static const int g_nChallenges    = sizeof(g_challenges) / sizeof(*g_challenges);
+
 
 atomic_flag dataLock;
 #define LOCK(x) \
@@ -131,19 +133,21 @@ void sendPacket(
 
 static void newChallenge(void)
 {
-  int next = g_challengeIndex + 1;
-  if (next == sizeof(g_challenges) / sizeof(*g_challenges))
-    next = 0;
+  int next = g_challengeIndex - 1;
+  if (next < 0)
+    next = g_nChallenges - 1;
 
   do
   {
-    g_challenges[next] = rand() % UINT32_MAX;
-    if (g_challenges[next] == 0 || g_challenges[next] == 0xFFFFFFFF)
+    uint32_t new = rand() % UINT32_MAX;
+    if (new == 0 || new == 0xFFFFFFFF)
       continue;
+
+    g_challenges[next] = new;
+    g_challengeIndex   = next;
+    return;
   }
   while(false);
-
-  g_challengeIndex = next;
 }
 
 static bool validateChallenge(uint32_t challenge, uint32_t mutate)
@@ -151,20 +155,15 @@ static bool validateChallenge(uint32_t challenge, uint32_t mutate)
   if (challenge == 0xFFFFFFFF)
     return false;
 
-  int index = g_challengeIndex;
   challenge ^= mutate;
-  for(int i = 0; i < sizeof(g_challenges) / sizeof(*g_challenges); ++i)
+  int index = g_challengeIndex;
+  for(int i = 0; i < g_nChallenges; ++i)
   {
     if (g_challenges[index] == challenge)
       return true;
 
-    if (index == 0)
-      index = (sizeof(g_challenges) / sizeof(*g_challenges)) - 1;
-    else
-      --index;
-
-    if (g_challenges[index] == 0)
-      return false;
+    if (++index == g_nChallenges)
+      index = 0;
   }
 
   return false;
@@ -597,7 +596,10 @@ int main(int argc, char *argv[])
   g_socket = socket(AF_INET, SOCK_RAW, IPPROTO_RAW);
 
   srand(time(NULL));
-  newChallenge();
+
+  /* pre-populate the challenges */
+  for(int i = 0; i < g_nChallenges; ++i)
+    newChallenge();
 
   atomic_flag_clear(&dataLock);
   pthread_t qt;
