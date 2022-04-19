@@ -76,38 +76,41 @@ uint16_t csum(void *buf, int cb)
   return (uint16_t)~((sum >> 16) + (sum & 0xffff));
 }
 
-void sendPacket(
-  uint32_t daddr, uint32_t saddr,
-  uint16_t dport, uint16_t sport,
-  void *   data , uint16_t len)
+static char g_datagram[1400] = {0};
+static void initDatagram(void)
 {
-  const int size = sizeof(struct iphdr) + sizeof(struct udphdr) + len;
-
-  char datagram[size];
-  memset(datagram, 0, size);
-
-  struct iphdr  * iph = (struct iphdr *)datagram;
-  struct udphdr * udp = (struct udphdr *)(iph + 1);
-  char * payload      = (char *)(udp + 1);
-
-  memcpy(payload, data, len);
+  struct iphdr  * iph = (struct iphdr *)g_datagram;
   iph->ihl      = 5;
   iph->version  = 4;
   iph->tos      = 0;
-  iph->tot_len  = size;
   iph->id       = htonl(54321);
   iph->frag_off = 0;
   iph->ttl      = 255;
   iph->protocol = IPPROTO_UDP;
   iph->check    = 0;
-  iph->saddr    = saddr;
-  iph->daddr    = daddr;
-  iph->check    = csum((unsigned short *)datagram, sizeof(*iph));
+}
+
+/* NOTE: not thread safe due to the use of g_datagram */
+static void sendPacket(
+  uint32_t daddr, uint32_t saddr,
+  uint16_t dport, uint16_t sport,
+  void *   data , uint16_t len)
+{
+  struct iphdr  * iph = (struct iphdr *)g_datagram;
+  struct udphdr * udp = (struct udphdr *)(iph + 1);
+  char * payload = (char *)(udp + 1);
+
+  iph->tot_len = sizeof(*iph) + sizeof(*udp) + len;
+  iph->saddr   = saddr;
+  iph->daddr   = daddr;
+  iph->check   = csum((unsigned short *)g_datagram, sizeof(*iph));
 
   udp->source = sport;
   udp->dest   = dport;
   udp->len    = htons(8 + len);
   udp->check  = 0;
+
+  memcpy(payload, data, len);
 
   {
     char psuedogram[sizeof(struct pseudo_header) + sizeof(*udp) + len];
@@ -128,7 +131,7 @@ void sendPacket(
     .sin_addr.s_addr = daddr
   };
 
-  sendto(g_socket, datagram, sizeof(datagram), 0,
+  sendto(g_socket, g_datagram, iph->tot_len, 0,
       (struct sockaddr *)&sin, sizeof(sin));
 }
 
@@ -612,6 +615,9 @@ int main(int argc, char *argv[])
   g_socket = socket(AF_INET, SOCK_RAW, IPPROTO_RAW);
 
   srand(time(NULL));
+
+  /* initialie the UDP datagram */
+  initDatagram();
 
   /* pre-populate the challenges */
   for(int i = 0; i < g_nChallenges; ++i)
