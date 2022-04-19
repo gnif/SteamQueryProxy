@@ -73,6 +73,13 @@ even if this application is not running:
 
     iptables -A INPUT -p udp -m udp --dport 27015 -m length --length 33:57 -j NFQUEUE --queue-num 0 --queue-bypass
 
+NOTE: You MUST have an accept rule for the loopback device `lo` before this rule
+as this application needs to connect to the game server. Failure to do this will
+result in an infinite loop, for example:
+
+    iptables -A INPUT -i lo -j ACCEPT
+    iptables -A INPUT -p udp -m udp --dport 27015 -m length --length 33:57 -j NFQUEUE --queue-num 0 --queue-bypass
+
 After this has been done simply start SteamQueryProxy for the correct queue on
 the game port, for example:
 
