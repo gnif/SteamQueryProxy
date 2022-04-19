@@ -313,6 +313,7 @@ static bool parse_payload(void * payload, uint16_t len)
       return false;
     }
 
+    // this is deprecated but implement it anyway for completeness
     case A2A_PING:
     {
       sendPacket(
@@ -329,6 +330,7 @@ static bool parse_payload(void * payload, uint16_t len)
       return false;
     }
 
+    // this is deprecated but implement it anyway for completeness
     case A2S_SERVERQUERY_GETCHALLENGE:
     {
       sendChallenge(iph, udp);
