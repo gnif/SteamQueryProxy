@@ -57,34 +57,39 @@ Cache a2sRules  = { 0 };
 #define A2A_PING                     0x69
 #define A2S_SERVERQUERY_GETCHALLENGE 0x57
 
-struct pseudo_header
+unsigned short csum(unsigned short *ptr,int nbytes)
 {
-  u_int32_t source_address;
-  u_int32_t dest_address;
-  u_int8_t placeholder;
-  u_int8_t protocol;
-  u_int16_t udp_length;
-};
+	register long  sum;
+	unsigned short oddbyte;
 
-uint16_t csum(void *buf, int cb)
-{
-  uint16_t *ptr = (uint16_t *)buf;
-  int32_t sum = (cb & 1) ? ((uint8_t *)buf)[cb - 1] : 0;
-  cb /= 2;
-  while(cb--)
-    sum += *ptr++;
-  return (uint16_t)~((sum >> 16) + (sum & 0xffff));
+	sum = 0;
+	while(nbytes>1)
+  {
+		sum    += *ptr++;
+		nbytes -= 2;
+	}
+
+	if(nbytes == 1)
+  {
+		oddbyte               = 0;
+		*((u_char *)&oddbyte) = *(u_char *)ptr;
+		sum                  += oddbyte;
+	}
+
+	sum = (sum >> 16) + (sum & 0xffff);
+	sum = sum + (sum >> 16);
+	return (short)~sum;
 }
 
-static char g_datagram[1400] = {0};
+static char g_datagram[1400];
 static void initDatagram(void)
 {
+  memset(g_datagram, 0, sizeof(g_datagram));
   struct iphdr  * iph = (struct iphdr *)g_datagram;
   iph->ihl      = 5;
   iph->version  = 4;
-  iph->tos      = 0;
-  iph->id       = htonl(54321);
-  iph->frag_off = 0;
+  iph->tos      = IPTOS_DSCP_EF;
+  iph->frag_off = htons(IP_DF);
   iph->ttl      = 255;
   iph->protocol = IPPROTO_UDP;
   iph->check    = 0;
@@ -100,10 +105,15 @@ static void sendPacket(
   struct udphdr * udp = (struct udphdr *)(iph + 1);
   char * payload = (char *)(udp + 1);
 
+  static int id = 0;
+  iph->id      = htonl(saddr ^ daddr ^ dport ^ sport ^ id++);
   iph->tot_len = sizeof(*iph) + sizeof(*udp) + len;
   iph->saddr   = saddr;
   iph->daddr   = daddr;
+#if 0
+  iph->check   = 0;
   iph->check   = csum((unsigned short *)g_datagram, sizeof(*iph));
+#endif
 
   udp->source = sport;
   udp->dest   = dport;
@@ -111,8 +121,17 @@ static void sendPacket(
   udp->check  = 0;
 
   memcpy(payload, data, len);
-
+#if 0
   {
+    struct pseudo_header
+    {
+      u_int32_t source_address;
+      u_int32_t dest_address;
+      u_int8_t  placeholder;
+      u_int8_t  protocol;
+      u_int16_t udp_length;
+    };
+
     char psuedogram[sizeof(struct pseudo_header) + sizeof(*udp) + len];
     struct pseudo_header * psh = (struct pseudo_header *)psuedogram;
     psh->source_address = saddr;
@@ -121,8 +140,10 @@ static void sendPacket(
     psh->protocol       = IPPROTO_UDP;
     psh->udp_length     = htons(sizeof(struct udphdr) + len);
     memcpy(psh + 1, udp, sizeof(*udp) + len);
+
     udp->check = csum((unsigned short *)psuedogram, sizeof(psuedogram));
   }
+#endif
 
   struct sockaddr_in sin =
   {
@@ -177,8 +198,11 @@ static void sendChallenge(struct iphdr * iph, struct udphdr * udp)
 {
   char buffer[9];
   memcpy(buffer, "\xFF\xFF\xFF\xFF\x41", 5);
-  uint32_t * challenge = (uint32_t *)(buffer + 5);
-  *challenge = g_challenges[g_challengeIndex] ^ (iph->saddr + udp->source);
+  void * challenge = (void *)(buffer + 5);
+
+  const uint32_t ch = g_challenges[g_challengeIndex] ^
+    (iph->saddr + udp->source);
+  memcpy(challenge, &ch, sizeof(ch));
 
   sendPacket(
     iph->saddr,
@@ -213,6 +237,7 @@ static bool parse_payload(void * payload, uint16_t len)
   if (*header != 0xFFFFFFFF)
     return true;
 
+  uint32_t challenge;
   uint8_t * query = (uint8_t *)(header + 1);
   switch(*query)
   {
@@ -228,8 +253,8 @@ static bool parse_payload(void * payload, uint16_t len)
         return false;
       }
 
-      uint32_t * challenge = (uint32_t *)(data + 20);
-      if (!validateChallenge(*challenge, iph->saddr + udp->source))
+      memcpy(&challenge, data + 20, sizeof(challenge));
+      if (!validateChallenge(challenge, iph->saddr + udp->source))
       {
         sendChallenge(iph, udp);
         return false;
@@ -246,7 +271,7 @@ static bool parse_payload(void * payload, uint16_t len)
       UNLOCK(dataLock);
 
       if (g_verbose)
-        printf("A2S_INFO 0x%08x\n", *challenge);
+        printf("A2S_INFO 0x%08x\n", challenge);
 
       return false;
     }
@@ -259,8 +284,8 @@ static bool parse_payload(void * payload, uint16_t len)
         return false;
       }
 
-      uint32_t * challenge = (uint32_t *)(query + 1);
-      if (!validateChallenge(*challenge, iph->saddr + udp->source))
+      memcpy(&challenge, query + 1, sizeof(challenge));
+      if (!validateChallenge(challenge, iph->saddr + udp->source))
       {
         sendChallenge(iph, udp);
         return false;
@@ -277,7 +302,7 @@ static bool parse_payload(void * payload, uint16_t len)
       UNLOCK(dataLock);
 
       if (g_verbose)
-        printf("A2S_PLAYER 0x%08x\n", *challenge);
+        printf("A2S_PLAYER 0x%08x\n", challenge);
 
       return false;
     }
@@ -290,8 +315,8 @@ static bool parse_payload(void * payload, uint16_t len)
         return false;
       }
 
-      uint32_t * challenge = (uint32_t *)(query + 1);
-      if (!validateChallenge(*challenge, iph->saddr + udp->source))
+      memcpy(&challenge, query + 1, sizeof(challenge));
+      if (!validateChallenge(challenge, iph->saddr + udp->source))
       {
         sendChallenge(iph, udp);
         return false;
@@ -308,7 +333,7 @@ static bool parse_payload(void * payload, uint16_t len)
       UNLOCK(dataLock);
 
       if (g_verbose)
-        printf("A2S_RULES 0x%08x\n", *challenge);
+        printf("A2S_RULES 0x%08x\n", challenge);
 
       return false;
     }
@@ -435,8 +460,8 @@ static void * queryThread(void * opaque)
 
       if (haveAnswer)
       {
-        uint32_t * challenge = (uint32_t *)(payload + 20);
-        *challenge = answer;
+        void * challenge = (void *)(payload + 20);
+        memcpy(challenge, &answer, sizeof(answer));
       }
 
       *header = 0xFFFFFFFF;
@@ -463,10 +488,10 @@ read:
       {
         case S2C_CHALLENGE:
         {
-          uint32_t * challenge = (uint32_t *)(query + 1);
-          answer     = *challenge;
+          void * challenge = (void *)(query + 1);
+          memcpy(&answer, challenge, sizeof(answer));
           haveAnswer = true;
-          printf("Got S2C_CHALLENGE:: 0x%08x\n", *challenge);
+          printf("Got S2C_CHALLENGE:: 0x%08x\n", answer);
           continue;
         }
 
@@ -483,11 +508,11 @@ read:
           UNLOCK(dataLock);
 
           // request the player info
-          uint32_t * challenge = (uint32_t *)(query + 1);
+          void * challenge = (void *)(query + 1);
 
           *header    = 0xFFFFFFFF;
           *query     = A2S_PLAYER;
-          *challenge = answer;
+          memcpy(challenge, &answer, sizeof(answer));
 
           sendto(sock, buffer, 9, 0,
               (struct sockaddr *)&sin, sizeof(sin));
@@ -507,11 +532,11 @@ read:
           UNLOCK(dataLock);
 
           // request the rules
-          uint32_t * challenge = (uint32_t *)(query + 1);
+          void * challenge = (void *)(query + 1);
 
           *header    = 0xFFFFFFFF;
           *query     = A2S_RULES;
-          *challenge = answer;
+          memcpy(challenge, &answer, sizeof(answer));
 
           sendto(sock, buffer, 9, 0,
               (struct sockaddr *)&sin, sizeof(sin));
