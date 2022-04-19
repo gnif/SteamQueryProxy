@@ -86,6 +86,8 @@ static void initDatagram(void)
 {
   memset(g_datagram, 0, sizeof(g_datagram));
   struct iphdr  * iph = (struct iphdr *)g_datagram;
+  struct udphdr * udp = (struct udphdr *)(iph + 1);
+
   iph->ihl      = 5;
   iph->version  = 4;
   iph->tos      = IPTOS_DSCP_EF;
@@ -93,6 +95,7 @@ static void initDatagram(void)
   iph->ttl      = 255;
   iph->protocol = IPPROTO_UDP;
   iph->check    = 0;
+  udp->check    = 0;
 }
 
 /* NOTE: not thread safe due to the use of g_datagram */
@@ -118,7 +121,6 @@ static void sendPacket(
   udp->source = sport;
   udp->dest   = dport;
   udp->len    = htons(8 + len);
-  udp->check  = 0;
 
   memcpy(payload, data, len);
 #if 0
