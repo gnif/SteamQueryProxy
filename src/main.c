@@ -59,26 +59,26 @@ Cache a2sRules  = { 0 };
 
 unsigned short csum(unsigned short *ptr,int nbytes)
 {
-	register long  sum;
-	unsigned short oddbyte;
+  register long  sum;
+  unsigned short oddbyte;
 
-	sum = 0;
-	while(nbytes>1)
+  sum = 0;
+  while(nbytes>1)
   {
-		sum    += *ptr++;
-		nbytes -= 2;
-	}
+    sum    += *ptr++;
+    nbytes -= 2;
+  }
 
-	if(nbytes == 1)
+  if(nbytes == 1)
   {
-		oddbyte               = 0;
-		*((u_char *)&oddbyte) = *(u_char *)ptr;
-		sum                  += oddbyte;
-	}
+    oddbyte               = 0;
+    *((u_char *)&oddbyte) = *(u_char *)ptr;
+    sum                  += oddbyte;
+  }
 
-	sum = (sum >> 16) + (sum & 0xffff);
-	sum = sum + (sum >> 16);
-	return (short)~sum;
+  sum = (sum >> 16) + (sum & 0xffff);
+  sum = sum + (sum >> 16);
+  return (short)~sum;
 }
 
 static char g_datagram[1400];
