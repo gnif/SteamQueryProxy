@@ -179,7 +179,7 @@ static void newChallenge(void)
 
 static bool validateChallenge(uint32_t challenge, uint32_t mutate)
 {
-  if (challenge == 0xFFFFFFFF)
+  if (challenge == 0 || challenge == 0xFFFFFFFF)
     return false;
 
   challenge ^= mutate;
