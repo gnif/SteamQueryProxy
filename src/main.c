@@ -447,6 +447,13 @@ static void * queryThread(void * opaque)
   socklen_t slen = sizeof(sin);
   int       sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
 
+  struct timeval tv =
+  {
+    .tv_sec  = 1,
+    .tv_usec = 0
+  };
+  setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+
   bool     haveAnswer = false;
   uint32_t answer     = 0;
   for(;;)
