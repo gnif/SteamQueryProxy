@@ -203,7 +203,7 @@ static void sendChallenge(struct iphdr * iph, struct udphdr * udp)
   void * challenge = (void *)(buffer + 5);
 
   const uint32_t ch = g_challenges[g_challengeIndex] ^
-    (iph->saddr + udp->source);
+    (iph->saddr ^ udp->dest);
   memcpy(challenge, &ch, sizeof(ch));
 
   sendPacket(
@@ -256,7 +256,7 @@ static bool parse_payload(void * payload, uint16_t len)
       }
 
       memcpy(&challenge, data + 20, sizeof(challenge));
-      if (!validateChallenge(challenge, iph->saddr + udp->source))
+      if (!validateChallenge(challenge, iph->saddr ^ udp->dest))
       {
         sendChallenge(iph, udp);
         return false;
@@ -287,7 +287,7 @@ static bool parse_payload(void * payload, uint16_t len)
       }
 
       memcpy(&challenge, query + 1, sizeof(challenge));
-      if (!validateChallenge(challenge, iph->saddr + udp->source))
+      if (!validateChallenge(challenge, iph->saddr ^ udp->dest))
       {
         sendChallenge(iph, udp);
         return false;
@@ -318,7 +318,7 @@ static bool parse_payload(void * payload, uint16_t len)
       }
 
       memcpy(&challenge, query + 1, sizeof(challenge));
-      if (!validateChallenge(challenge, iph->saddr + udp->source))
+      if (!validateChallenge(challenge, iph->saddr ^ udp->dest))
       {
         sendChallenge(iph, udp);
         return false;
