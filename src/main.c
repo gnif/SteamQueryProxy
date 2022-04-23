@@ -249,7 +249,7 @@ static bool parse_payload(void * payload, uint16_t len)
       if (memcmp(data, "Source Engine Query\0", 20) != 0)
         break;
 
-      if (len == 53)
+      if (udp->len == 25)
       {
         sendChallenge(iph, udp);
         return false;
@@ -280,7 +280,7 @@ static bool parse_payload(void * payload, uint16_t len)
 
     case A2S_PLAYER:
     {
-      if (len == 33)
+      if (udp->len == 9)
       {
         sendChallenge(iph, udp);
         return false;
@@ -311,7 +311,7 @@ static bool parse_payload(void * payload, uint16_t len)
 
     case A2S_RULES:
     {
-      if (len == 33)
+      if (udp->len == 9)
       {
         sendChallenge(iph, udp);
         return false;
