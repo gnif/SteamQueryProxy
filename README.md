@@ -40,20 +40,13 @@ crafts a valid reply packet with the appropriate information and sends this to
 the client. The intercepted packet is dropped preventing it from reaching the
 application.
 
-# Limitations
-
-At current this project does not work with split packet messages, as such
-datagrams that exceed 1400 bytes will likely cause issues on servers with long
-descriptions or large player counts until this is addressed. This is not a
-technical limitation, it just simply has not yet been implemented yet.
-
 # Building
 
 ## Dependencies
 
 * cmake
 * gcc
-* libnetfilter-queue-dev
+* libnetfilter-queue-dev (>= 1.0.4)
 * libmnl-dev
 
 ## Compiling
@@ -70,23 +63,23 @@ make
 Add a iptables nfqueue target that processes every incoming packet for the query
 port (usually 27015), I recommend using the following rule which will fail safe
 even if this application is not running:
-
+```
     iptables -A INPUT -p udp -m udp --dport 27015 -m length --length 33:57 -j NFQUEUE --queue-num 0 --queue-bypass
-
+```
 NOTE: You MUST have an accept rule for the loopback device `lo` before this rule
 as this application needs to connect to the game server. Failure to do this will
 result in an infinite loop, for example:
-
+```
     iptables -A INPUT -i lo -j ACCEPT
     iptables -A INPUT -p udp -m udp --dport 27015 -m length --length 33:57 -j NFQUEUE --queue-num 0 --queue-bypass
-
+```
 After this has been done simply start SteamQueryProxy for the correct queue on
 the game port, for example:
-
+```
     ./SteamQueryProxy -p 27105 -n 0
-
-You should start to see messages such as the following...
-
+```
+You should start to see messages such as the following:
+```
     Got S2C_CHALLENGE:: 0x1545279c
     Got A2S_INFO_REPLY: 203 bytes
     Got A2S_PLAYER_REPLY: 40 bytes
@@ -109,7 +102,7 @@ You should start to see messages such as the following...
     A2S_INFO 0xd3e0952d
     A2S_INFO 0xafcf3596
     A2S_INFO 0xff49c049
-
+```
 Messages starting with `Got` are sucessful requests for the actual server
 information from the game server which are cached in ram. All other messages are
 intercepted messages which have been handled by this application and the
@@ -134,10 +127,10 @@ see packets queue.
 
 If you wish to use the multi-queue/thread configuration you will need to adjust
 your iptables rules to account for additional queues.
-
+```
   iptables -A INPUT -i lo -j ACCEPT
   iptables -A INPUT -p udp -m udp --dport 27015 -m length --length 33:57 -j NFQUEUE --queue-balance 0:1 --queue-bypass --queue-cpu-fanout
-
+```
 The above example creates two pools and balances incoming packets between them,
 it is possible to create more pools by changing the queue ID range, for example
 `0:3` would create four pools, with IDs, 0, 1, 2 and 3.
@@ -145,9 +138,9 @@ it is possible to create more pools by changing the queue ID range, for example
 When doing this it is required that you run the application with the correct
 parameters to process the data now entering these queues. Assuming you have used
 the example above, you would need to use two threads, for example:
-
+```
   ./SteamQueryProxy -p 27015 -n 0 -t 2
-
+```
 To ensure low latency processing the application should be run with nice -20 if
 possible, and be sure to not allocate too many threads as your CPU only has so
 many cores to run them.
