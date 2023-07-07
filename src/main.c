@@ -542,6 +542,7 @@ int main(int argc, char *argv[])
   if (queryPort < 1 || queryPort > 65535)
   {
     printf("Invalid query port\n");
+    printHelp();
     exit(EXIT_FAILURE);
   }
 
