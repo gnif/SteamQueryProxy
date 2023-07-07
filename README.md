@@ -83,7 +83,7 @@ result in an infinite loop, for example:
 After this has been done simply start SteamQueryProxy for the correct queue on
 the game port, for example:
 
-    ./SteamQueryProxy 0 27105
+    ./SteamQueryProxy -p 27105 -n 0
 
 You should start to see messages such as the following...
 
@@ -114,6 +114,43 @@ Messages starting with `Got` are sucessful requests for the actual server
 information from the game server which are cached in ram. All other messages are
 intercepted messages which have been handled by this application and the
 security challenge that has been used for the request.
+
+# Flood Mitigation
+
+It was pointed out that this tool might be useful for VSE flood protection and
+as such special care has been taken to add support for multi-queue support
+across multiple threads. Additionally any packets arriving from invalid IP
+addresses are also now ignored, with the option to also ignore private IP
+ranges.
+
+There is no way to completely prevent the VSE flood attack, however with the
+performance gains of using this tool, it should help to keep things operational.
+
+On my local loopback using four threads on an Epyc 7343 I was able to
+successfully handle a flood of 400,000 packets per second before I started to
+see packets queue.
+
+# Multi-Queue/Thread Configuration
+
+If you wish to use the multi-queue/thread configuration you will need to adjust
+your iptables rules to account for additional queues.
+
+  iptables -A INPUT -i lo -j ACCEPT
+  iptables -A INPUT -p udp -m udp --dport 27015 -m length --length 33:57 -j NFQUEUE --queue-balance 0:1 --queue-bypass --queue-cpu-fanout
+
+The above example creates two pools and balances incoming packets between them,
+it is possible to create more pools by changing the queue ID range, for example
+`0:3` would create four pools, with IDs, 0, 1, 2 and 3.
+
+When doing this it is required that you run the application with the correct
+parameters to process the data now entering these queues. Assuming you have used
+the example above, you would need to use two threads, for example:
+
+  ./SteamQueryProxy -p 27015 -n 0 -t 2
+
+To ensure low latency processing the application should be run with nice -20 if
+possible, and be sure to not allocate too many threads as your CPU only has so
+many cores to run them.
 
 # Donations
 

@@ -72,12 +72,20 @@ link_libraries(
 )
 
 set(SOURCES
-	src/main.c
+	src/client.c
+	src/util.c
+	src/challenge.c
 )
 
-add_executable(SteamQueryProxy ${SOURCES})
+add_executable(SteamQueryProxy src/main.c ${SOURCES})
+add_executable(Test src/test.c ${SOURCES})
 
 target_link_libraries(SteamQueryProxy
+	${EXE_FLAGS}
+	PkgConfig::NETFILTER
+)
+
+target_link_libraries(Test
 	${EXE_FLAGS}
 	PkgConfig::NETFILTER
 )
