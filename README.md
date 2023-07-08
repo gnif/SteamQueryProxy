@@ -138,7 +138,7 @@ your iptables rules to account for additional queues.
 
 ```bash
 iptables -A INPUT -i lo -j ACCEPT
-iptables -A INPUT -p udp -m udp --dport 27015 -m length --length 33:57 -j NFQUEUE --queue-balance 0:1 --queue-bypass --queue-cpu-fanout
+iptables -A INPUT -p udp -m udp --dport 27015 -m length --length 33:57 -j NFQUEUE --queue-balance 0:1 --queue-bypass
 ```
 
 The above example creates two pools and balances incoming packets between them,

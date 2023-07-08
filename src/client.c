@@ -12,10 +12,7 @@
 #include <arpa/inet.h>
 #include <netinet/in.h>
 
-Payload a2sInfo   = { 0 };
-Payload gsInfo    = { 0 };
-Payload a2sPlayer = { 0 };
-Payload a2sRules  = { 0 };
+static Payload g_cache[PT_MAX] = {0};
 
 static int g_sock;
 static struct sockaddr_in g_sin;
@@ -166,9 +163,10 @@ inline static void freePayload(Payload * p)
   p->data = NULL;
 }
 
-inline static void assignPayload(Payload * dst, Payload * src)
+inline static void assignPayload(PayloadType type, Payload * src)
 {
-  LOCK(dst->lock);
+  Payload * dst = &g_cache[type];
+  rwlock_writeLock(&dst->lock);
 
   freePayload(dst);
 
@@ -188,7 +186,7 @@ inline static void assignPayload(Payload * dst, Payload * src)
   dst->compressed = src->compressed;
   dst->release    = true;
 
-  UNLOCK(dst->lock);
+  rwlock_writeUnlock(&dst->lock);
 }
 
 static void * clientThread(void * opaque)
@@ -303,7 +301,7 @@ read:
 
       case A2S_INFO_REPLY:
         printf("Got A2S_INFO_REPLY: %d bytes\n", p.size);
-        assignPayload(&a2sInfo, &p);
+        assignPayload(PT_A2S_INFO, &p);
         stage = STAGE_PLAYER;
         break;
 
@@ -315,18 +313,18 @@ read:
           exit(1);
         }
 
-        assignPayload(&gsInfo, &p);
+        assignPayload(PT_GS_INFO, &p);
         goto read;
 
       case A2S_PLAYER_REPLY:
         printf("Got A2S_PLAYER_REPLY: %d bytes\n", p.size);
-        assignPayload(&a2sPlayer, &p);
+        assignPayload(PT_A2S_PLAYER, &p);
         stage = STAGE_RULES;
         break;
 
       case A2S_RULES_REPLY:
         printf("Got A2S_RULES_REPLY: %d bytes\n", p.size);
-        assignPayload(&a2sRules, &p);
+        assignPayload(PT_A2S_RULES, &p);
         stage = STAGE_SLEEP;
         break;
 
@@ -349,6 +347,9 @@ void client_start(const char * ip, unsigned int queryPort, bool goldSource,
   g_sin.sin_port = htons(queryPort);
   g_goldSource = goldSource;
 
+  for(int i = 0; i < PT_MAX; ++i)
+    rwlock_init(&g_cache[i].lock);
+
   if (threaded)
     pthread_create(&qt, NULL, clientThread, NULL);
   else
@@ -358,7 +359,10 @@ void client_start(const char * ip, unsigned int queryPort, bool goldSource,
 bool client_isReady()
 {
   // should we wait for a GS_INFO packet too?
-  return a2sInfo.size && a2sPlayer.size && a2sRules.size;
+  return
+    g_cache[PT_A2S_INFO  ].size &&
+    g_cache[PT_A2S_PLAYER].size &&
+    g_cache[PT_A2S_RULES ].size;
 }
 
 void client_stop()
@@ -366,23 +370,19 @@ void client_stop()
   pthread_join(qt, NULL);
 }
 
-const Payload * client_getPayload(int id)
+const Payload * client_getPayload(PayloadType type)
 {
-  Payload * p;
-  switch(id)
-  {
-    case A2S_INFO  : p = &a2sInfo  ; break;
-    case GS_INFO   : p = &gsInfo   ; break;
-    case A2S_PLAYER: p = &a2sPlayer; break;
-    case A2S_RULES : p = &a2sRules ; break;
-    default:
-      return NULL;
-  }
-
-  if (!p->data)
+  if (type < 0 || type > PT_MAX)
     return NULL;
 
-  LOCK(p->lock);
+  Payload * p = &g_cache[type];
+  rwlock_readLock(&p->lock);
+  if (!p->data)
+  {
+    rwlock_readUnlock(&p->lock);
+    return NULL;
+  }
+
   return p;
 }
 
@@ -390,5 +390,5 @@ void client_releasePayload(const Payload * p)
 {
   // cast away const so we can unlock it
   Payload * pp = (Payload *)p;
-  UNLOCK(pp->lock);
+  rwlock_readUnlock(&pp->lock);
 }

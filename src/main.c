@@ -76,9 +76,9 @@ static void sendPayload(
   int sock,
   uint32_t daddr, uint32_t saddr,
   uint16_t dport, uint16_t sport,
-  uint8_t id)
+  PayloadType type)
 {
-  const Payload * p = client_getPayload(id);
+  const Payload * p = client_getPayload(type);
   if (!p)
     return;
 
@@ -165,8 +165,12 @@ static bool parse_payload(int sock, void * payload, uint16_t len)
   uint32_t ip = ntohl(h->ip.saddr);
   if (isInvalidIPv4(ip, g_dropPrivate))
   {
-    char saddr[INET_ADDRSTRLEN];
-    inet_ntop(AF_INET, &h->ip.saddr, saddr, sizeof(saddr));
+    if (g_verbose)
+    {
+      char saddr[INET_ADDRSTRLEN];
+      inet_ntop(AF_INET, &h->ip.saddr, saddr, sizeof(saddr));
+      printf("Drop Bad IP: %s\n", saddr);
+    }
     return false;
   }
 
@@ -212,10 +216,10 @@ static bool parse_payload(int sock, void * payload, uint16_t len)
 
       if (g_goldSource)
         sendPayload(sock, h->ip.saddr, h->ip.daddr, h->udp.source, h->udp.dest,
-            GS_INFO);
+            PT_GS_INFO);
 
       sendPayload(sock, h->ip.saddr, h->ip.daddr, h->udp.source, h->udp.dest,
-          A2S_INFO);
+          PT_A2S_INFO);
 
       if (g_verbose)
         printf("A2S_INFO 0x%08x\n", challenge);
@@ -238,7 +242,7 @@ static bool parse_payload(int sock, void * payload, uint16_t len)
       }
 
       sendPayload(sock, h->ip.saddr, h->ip.daddr, h->udp.source, h->udp.dest,
-          A2S_PLAYER);
+          PT_A2S_PLAYER);
       if (g_verbose)
         printf("A2S_PLAYER 0x%08x\n", challenge);
 
@@ -261,7 +265,7 @@ static bool parse_payload(int sock, void * payload, uint16_t len)
       }
 
       sendPayload(sock, h->ip.saddr, h->ip.daddr, h->udp.source, h->udp.dest,
-          A2S_RULES);
+          PT_A2S_RULES);
       if (g_verbose)
         printf("A2S_RULES 0x%08x\n", challenge);
 
@@ -389,6 +393,7 @@ void * netlinkThread(void * opaque)
 
   nlh = nfq_nlmsg_put(buf, NFQNL_MSG_CONFIG, ti->queueNum);
   nfq_nlmsg_cfg_put_params(nlh, NFQNL_COPY_PACKET, MAX_RECV_SIZE);
+  nfq_nlmsg_cfg_put_qmaxlen(nlh, 0xFFFFFFFF);
 
   mnl_attr_put_u32(nlh, NFQA_CFG_FLAGS, htonl(NFQA_CFG_F_GSO));
   mnl_attr_put_u32(nlh, NFQA_CFG_MASK, htonl(NFQA_CFG_F_GSO));
@@ -448,7 +453,7 @@ static void printHelp(void)
     "  iptables -A INPUT -i lo -j ACCEPT\n"
     "  iptables -A INPUT -p udp -m udp --dport 27015 \\\n"
     "    -m length --length 33:57 -j NFQUEUE \\\n"
-    "    --queue-balance 0:1 --queue-bypass --queue-cpu-fanout\n"
+    "    --queue-balance 0:1 --queue-bypass\n"
     "\n"
     "The first rule is to accept loopback traffic, without this, this\n"
     "application will get into an infinate loop, it MUST be present.\n"
