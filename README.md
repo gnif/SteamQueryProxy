@@ -128,7 +128,7 @@ There is no way to completely prevent the VSE flood attack, however with the
 performance gains of using this tool, it should help to keep things operational.
 
 On my local loopback using four threads on an Epyc 7343 I was able to
-successfully handle a flood of 400,000 packets per second before I started to
+successfully handle a flood of 1 million packets per second before I started to
 see packets queue.
 
 # Multi-Queue/Thread Configuration
@@ -156,6 +156,35 @@ the example above, you would need to use two threads, for example:
 To ensure low latency processing the application should be run with nice -20 if
 possible, and be sure to not allocate too many threads as your CPU only has so
 many cores to run them.
+
+# Statistics
+
+It is possible to print out packet count statistics from the application by
+specifying the `-s` or `--print-stats` argument the desired collection interval.
+
+Here is a sample of my system during a simulated VSE attack.
+
+```
+Stats=Packets: 882361  Blocked: 119918  Challenges: 762443  Answers: 0       Passed: 0      
+Stats=Packets: 905480  Blocked: 122705  Challenges: 782776  Answers: 0       Passed: 0      
+Stats=Packets: 943630  Blocked: 128027  Challenges: 815603  Answers: 0       Passed: 0      
+Stats=Packets: 877504  Blocked: 119748  Challenges: 757755  Answers: 0       Passed: 0      
+Stats=Packets: 906318  Blocked: 123261  Challenges: 783054  Answers: 3       Passed: 0      
+Stats=Packets: 990549  Blocked: 134388  Challenges: 856162  Answers: 0       Passed: 0      
+```
+
+The columns here are:
+
+  * Packets - The total packets processed by the application
+  * Blocked - The total packets blocked due to invalid source IPs.
+  * Challenges - The total number of challenges sent in response to a query
+  * Answers - The total number of answers to queries where the challenge was
+    answered correctly.
+  * Passed - The total number of packets passed through to the game server.
+
+As can be seen here, of the millions of spoofed packets sent, it was still
+possible for a legitmate client to query the server information unobstructed and
+zero traffic was passed to the backend game server.
 
 # Donations
 

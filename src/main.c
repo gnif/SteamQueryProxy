@@ -214,9 +214,21 @@ static bool parse_payload(int sock, void * payload, uint16_t len)
 
   uint32_t * header = (uint32_t *)payload;
 
-  // the query packets should really never be multi-packet
+  // the query packets should never be multi-packet
+  if (*header == HEADER_MULTI)
+  {
+    if (g_stats.enabled)
+      atomic_fetch_add(&g_stats.drops, 1);
+    return false;
+  }
+
+  // Check the header is incorrect, this may be game traffic to pass though
   if (*header != HEADER_SINGLE)
+  {
+    if (g_stats.enabled)
+      atomic_fetch_add(&g_stats.pass, 1);
     return true;
+  }
 
   uint32_t challenge;
   uint8_t * query = (uint8_t *)(header + 1);
@@ -331,6 +343,12 @@ static bool parse_payload(int sock, void * payload, uint16_t len)
 
       return false;
     }
+
+    // assume any other message types are an attack
+    default:
+      if (g_stats.enabled)
+        atomic_fetch_add(&g_stats.drops, 1);
+      return false;
   }
 
   if (g_stats.enabled)
