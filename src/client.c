@@ -281,7 +281,14 @@ read:
       continue;
     }
 
-    uint8_t * query = (uint8_t *)(p.data + 4);
+    uint8_t * query;
+
+    // some engines have a secondary header when the packet was split
+    if (*(uint32_t *)p.data == HEADER_SINGLE)
+      query = p.data + 4;
+    else
+      query = p.data;
+
     switch(*query)
     {
       case S2C_CHALLENGE:
