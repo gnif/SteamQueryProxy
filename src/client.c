@@ -212,6 +212,8 @@ static void * clientThread(void * opaque)
   enum Stage stage      = STAGE_INFO;
   bool       haveAnswer = false;
   uint32_t   answer     = -1;
+  Payload    p          = {0};
+
   for(;;)
   {
     switch(stage)
@@ -273,7 +275,6 @@ static void * clientThread(void * opaque)
     }
 
 read:
-    Payload p = {0};
     if (!getPayload(&p))
     {
       stage = STAGE_SLEEP;
