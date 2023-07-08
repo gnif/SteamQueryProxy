@@ -72,6 +72,7 @@ link_libraries(
 )
 
 set(SOURCES
+	src/global.c
 	src/client.c
 	src/util.c
 	src/challenge.c

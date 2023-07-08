@@ -1,3 +1,4 @@
+#include "global.h"
 #include "util.h"
 #include "client.h"
 #include "proto.h"
@@ -23,7 +24,21 @@
 
 static bool g_goldSource  = false;
 static bool g_dropPrivate = false;
-static bool g_verbose     = false;
+
+typedef struct
+{
+  bool       enabled;
+  int        interval;
+
+  atomic_int packets;
+  atomic_int drops;
+  atomic_int challenges;
+  atomic_int answers;
+  atomic_int pass;
+}
+Stats;
+
+static Stats g_stats = {0};
 
 UDPHeader g_udpHeader;
 static void initDatagram(void)
@@ -136,6 +151,9 @@ static void sendPayload(
 
 out:
   client_releasePayload(p);
+
+  if (g_stats.enabled)
+    atomic_fetch_add(&g_stats.answers, 1);
 }
 
 static void sendChallenge(int sock, UDPHeader * h)
@@ -150,10 +168,16 @@ static void sendChallenge(int sock, UDPHeader * h)
 
   sendPacket(sock, h->ip.saddr, h->ip.daddr, h->udp.source, h->udp.dest,
       &m, sizeof(m));
+
+  if (g_stats.enabled)
+    atomic_fetch_add(&g_stats.challenges, 1);
 }
 
 static bool parse_payload(int sock, void * payload, uint16_t len)
 {
+  if (g_stats.enabled)
+    atomic_fetch_add(&g_stats.packets, 1);
+
   if (len < sizeof(UDPHeader) || len > MAX_RECV_SIZE)
     return true;
 
@@ -165,6 +189,9 @@ static bool parse_payload(int sock, void * payload, uint16_t len)
   uint32_t ip = ntohl(h->ip.saddr);
   if (isInvalidIPv4(ip, g_dropPrivate))
   {
+    if (g_stats.enabled)
+      atomic_fetch_add(&g_stats.drops, 1);
+
     if (g_verbose)
     {
       char saddr[INET_ADDRSTRLEN];
@@ -285,6 +312,9 @@ static bool parse_payload(int sock, void * payload, uint16_t len)
       sendPacket(sock, h->ip.saddr, h->ip.daddr, h->udp.source, h->udp.dest,
         &m, g_goldSource ? 6 : sizeof(m));
 
+      if (g_stats.enabled)
+        atomic_fetch_add(&g_stats.answers, 1);
+
       if (g_verbose)
         printf("A2A_PING\n");
 
@@ -303,6 +333,8 @@ static bool parse_payload(int sock, void * payload, uint16_t len)
     }
   }
 
+  if (g_stats.enabled)
+    atomic_fetch_add(&g_stats.pass, 1);
   return true;
 }
 
@@ -445,6 +477,9 @@ static void printHelp(void)
     "  -t, --queue-threads <num> How many thread queues to process\n"
     "  -g, --goldsource          Set if using the GoldSource protocol\n"
     "  -d, --drop-private        Drop packets originating from private IPs\n"
+    "  -v, --verbose             Print verbose information for debugging\n"
+    "  -s, --print-stats <num>   Print statistics every <num> seconds\n"
+    "  -q, --quiet               Print less information\n"
     "  -h, --help                Print this help\n"
     "\n"
     "You MUST configure netfilter to redirect traffic to this application\n"
@@ -498,13 +533,15 @@ int main(int argc, char *argv[])
     {"goldsource"   , no_argument      , 0, 'g'},
     {"drop-private" , no_argument      , 0, 'd'},
     {"verbose"      , no_argument      , 0, 'v'},
+    {"quiet"        , no_argument      , 0, 'q'},
+    {"print-stats"  , required_argument, 0, 's'},
     {"help"         , no_argument      , 0, 'h'},
     {0              , 0                , 0,  0 }
   };
 
   int option;
   int option_index = 0;
-  while ((option = getopt_long(argc, argv, "p:n:t:gdvh",
+  while ((option = getopt_long(argc, argv, "p:n:t:gdvs:qh",
           long_options, &option_index)) != -1)
   {
     switch(option)
@@ -533,7 +570,23 @@ int main(int argc, char *argv[])
         g_verbose = true;
         break;
 
+      case 's':
+        g_stats.enabled  = true;
+        g_stats.interval = atoi(optarg);
+        if (g_stats.interval < 1)
+        {
+          fprintf(stderr, "Invalid stats interval, must be > 0\n");
+          printHelp();
+          return 1;
+        }
+        break;
+
+      case 'q':
+        g_quiet = true;
+        break;
+
       case 'h':
+      case '?':
         printHelp();
         return 1;
 
@@ -570,6 +623,27 @@ int main(int argc, char *argv[])
     ti->queueNum  = queueNum + i;
     ti->queryPort = queryPort;
     pthread_create(&t[i], NULL, netlinkThread, ti);
+  }
+
+  if (g_stats.enabled)
+  {
+    for(;;)
+    {
+      msleep(g_stats.interval * 1000);
+      int packets    = atomic_exchange(&g_stats.packets   , 0);
+      int drops      = atomic_exchange(&g_stats.drops     , 0);
+      int challenges = atomic_exchange(&g_stats.challenges, 0);
+      int answers    = atomic_exchange(&g_stats.answers   , 0);
+      int pass       = atomic_exchange(&g_stats.pass      , 0);
+
+      printf(
+          "Stats=Packets: %-7d "
+          "Blocked: %-7d "
+          "Challenges: %-7d "
+          "Answers: %-7d "
+          "Passed: %-7d\n",
+          packets, drops, challenges, answers, pass);
+    }
   }
 
   for(int i = 0; i < queueThreads; ++i)

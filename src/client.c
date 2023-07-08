@@ -2,6 +2,7 @@
 #include "proto.h"
 #include "util.h"
 #include "challenge.h"
+#include "global.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -294,19 +295,22 @@ read:
         void * challenge = (void *)(query + 1);
         memcpy(&answer, challenge, sizeof(answer));
         haveAnswer = true;
-        printf("Got S2C_CHALLENGE: 0x%08x\n", answer);
+        if (!g_quiet)
+          printf("Got S2C_CHALLENGE: 0x%08x\n", answer);
         freePayload(&p);
         break;
       }
 
       case A2S_INFO_REPLY:
-        printf("Got A2S_INFO_REPLY: %d bytes\n", p.size);
+        if (!g_quiet)
+          printf("Got A2S_INFO_REPLY: %d bytes\n", p.size);
         assignPayload(PT_A2S_INFO, &p);
         stage = STAGE_PLAYER;
         break;
 
       case GS_INFO_REPLY:
-        printf("Got GS_INFO_REPLY: %d bytes\n", p.size);
+        if (!g_quiet)
+          printf("Got GS_INFO_REPLY: %d bytes\n", p.size);
         if (!g_goldSource)
         {
           fprintf(stderr, "ERROR: Server is GoldSource\n");
@@ -317,13 +321,15 @@ read:
         goto read;
 
       case A2S_PLAYER_REPLY:
-        printf("Got A2S_PLAYER_REPLY: %d bytes\n", p.size);
+        if (!g_quiet)
+          printf("Got A2S_PLAYER_REPLY: %d bytes\n", p.size);
         assignPayload(PT_A2S_PLAYER, &p);
         stage = STAGE_RULES;
         break;
 
       case A2S_RULES_REPLY:
-        printf("Got A2S_RULES_REPLY: %d bytes\n", p.size);
+        if (!g_quiet)
+          printf("Got A2S_RULES_REPLY: %d bytes\n", p.size);
         assignPayload(PT_A2S_RULES, &p);
         stage = STAGE_SLEEP;
         break;
