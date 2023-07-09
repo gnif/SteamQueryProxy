@@ -185,9 +185,9 @@ static void sendChallenge(int sock, IPPacket * h)
   const uint32_t ch = challenge_get(h->ip.saddr ^ h->udp.dest);
   QueryMsg m =
   {
-    .header = HEADER_SINGLE,
-    .query  = S2C_CHALLENGE,
-    .answer = ch
+    .header    = HEADER_SINGLE,
+    .query     = S2C_CHALLENGE,
+    .challenge = ch
   };
 
   sendPacket(sock, h->ip.saddr, h->ip.daddr, h->udp.source, h->udp.dest,

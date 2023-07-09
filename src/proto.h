@@ -50,7 +50,16 @@ typedef struct __attribute__((packed))
 {
   uint32_t header;
   uint8_t  query;
-  uint32_t answer;
+  uint8_t  payload[20];
+  uint32_t challenge;
+}
+QueryInfoMsg;
+
+typedef struct __attribute__((packed))
+{
+  uint32_t header;
+  uint8_t  query;
+  uint32_t challenge;
 }
 QueryMsg;
 

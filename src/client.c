@@ -209,10 +209,9 @@ static void * clientThread(void * opaque)
   };
   setsockopt(g_sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
 
-  enum Stage stage      = STAGE_INFO;
-  bool       haveAnswer = false;
-  uint32_t   answer     = -1;
-  Payload    p          = {0};
+  enum Stage stage     = STAGE_INFO;
+  uint32_t   challenge = 0xFFFFFFFF;
+  Payload    p         = {0};
 
   for(;;)
   {
@@ -221,34 +220,29 @@ static void * clientThread(void * opaque)
       case STAGE_INFO:
       {
         challenge_new();
-        uint8_t buffer[25 + (haveAnswer ? 4 : 0)];
-        uint32_t * header  = (uint32_t *)buffer;
-        uint8_t  * query   = (uint8_t  *)(header + 1);
-        char     * payload = (char     *)(query  + 1);
-
-        if (haveAnswer)
+        static QueryInfoMsg m =
         {
-          void * challenge = (void *)(payload + 20);
-          memcpy(challenge, &answer, sizeof(answer));
-        }
+          .header    = HEADER_SINGLE,
+          .query     = A2S_INFO,
+          .payload   = "Source Engine Query"
+        };
 
-        *header = 0xFFFFFFFF;
-        *query  = A2S_INFO;
-        memcpy(payload, "Source Engine Query\0", 20);
-        sendto(g_sock, buffer, sizeof(buffer), 0,
-            (struct sockaddr *)&g_sin, sizeof(g_sin));
+        m.challenge = challenge;
+        sendto(g_sock, &m,
+            challenge != 0xFFFFFFFF ? sizeof(m) : sizeof(m) - 4,
+            0, (struct sockaddr *)&g_sin, sizeof(g_sin));
         break;
       }
 
       case STAGE_PLAYER:
       {
         // request the player info
-        QueryMsg m = {
-          .header = HEADER_SINGLE,
-          .query  = A2S_PLAYER,
-          .answer = answer
+        static QueryMsg m = {
+          .header    = HEADER_SINGLE,
+          .query     = A2S_PLAYER,
         };
 
+        m.challenge = challenge;
         sendto(g_sock, &m, sizeof(m), 0,
             (struct sockaddr *)&g_sin, sizeof(g_sin));
         break;
@@ -257,12 +251,12 @@ static void * clientThread(void * opaque)
       case STAGE_RULES:
       {
         // request the rules
-        QueryMsg m = {
-          .header = HEADER_SINGLE,
-          .query  = A2S_RULES,
-          .answer = answer
+        static QueryMsg m = {
+          .header    = HEADER_SINGLE,
+          .query     = A2S_RULES,
         };
 
+        m.challenge = challenge;
         sendto(g_sock, &m, sizeof(m), 0,
             (struct sockaddr *)&g_sin, sizeof(g_sin));
         break;
@@ -293,11 +287,9 @@ read:
     {
       case S2C_CHALLENGE:
       {
-        void * challenge = (void *)(query + 1);
-        memcpy(&answer, challenge, sizeof(answer));
-        haveAnswer = true;
+        challenge = *(uint32_t *)(query + 1);
         if (!g_quiet)
-          printf("Got S2C_CHALLENGE: 0x%08x\n", answer);
+          printf("Got S2C_CHALLENGE: 0x%08x\n", challenge);
         freePayload(&p);
         break;
       }
