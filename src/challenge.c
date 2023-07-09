@@ -22,7 +22,7 @@ void challenge_new(void)
 
   do
   {
-    uint32_t new = rand() % UINT32_MAX;
+    uint32_t new = jenkinsHash(rand() % UINT32_MAX);
     if (new == 0 || new == 0xFFFFFFFF)
       continue;
 
@@ -41,7 +41,8 @@ bool challenge_validate(uint32_t challenge, uint32_t mutate)
   int index = g_challengeIndex;
   for(int i = 0; i < g_nChallenges; ++i)
   {
-    if (jenkinsHash(g_challenges[index], mutate) == challenge)
+    const uint32_t check = g_challenges[index] + jenkinsHash(mutate);
+    if (check == challenge)
       return true;
 
     if (++index == g_nChallenges)
@@ -53,5 +54,5 @@ bool challenge_validate(uint32_t challenge, uint32_t mutate)
 
 uint32_t challenge_get(uint32_t mutate)
 {
-  return jenkinsHash(g_challenges[g_challengeIndex], mutate);
+  return g_challenges[g_challengeIndex] + jenkinsHash(mutate);
 }

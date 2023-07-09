@@ -104,21 +104,13 @@ bool isInvalidIPv4(uint32_t ip, bool private)
   return false;
 }
 
-uint32_t jenkinsHash(uint32_t value1, uint32_t value2)
+uint32_t jenkinsHash(uint32_t value)
 {
-  value1 = (value1 + 0x7ed55d16) + (value1 << 12);
-  value1 = (value1 ^ 0xc761c23c) ^ (value1 >> 19);
-  value1 = (value1 + 0x165667b1) + (value1 << 5);
-  value1 = (value1 + 0xd3a2646c) ^ (value1 << 9);
-  value1 = (value1 + 0xfd7046c5) + (value1 << 3);
-  value1 = (value1 ^ 0xb55a4f09) ^ (value1 >> 16);
-
-  value2 = (value2 + 0x7ed55d16) + (value2 << 12);
-  value2 = (value2 ^ 0xc761c23c) ^ (value2 >> 19);
-  value2 = (value2 + 0x165667b1) + (value2 << 5);
-  value2 = (value2 + 0xd3a2646c) ^ (value2 << 9);
-  value2 = (value2 + 0xfd7046c5) + (value2 << 3);
-  value2 = (value2 ^ 0xb55a4f09) ^ (value2 >> 16);
-
-  return value1 + value2;
+  value = (value + 0x7ed55d16) + (value << 12);
+  value = (value ^ 0xc761c23c) ^ (value >> 19);
+  value = (value + 0x165667b1) + (value << 5);
+  value = (value + 0xd3a2646c) ^ (value << 9);
+  value = (value + 0xfd7046c5) + (value << 3);
+  value = (value ^ 0xb55a4f09) ^ (value >> 16);
+  return value;
 }
