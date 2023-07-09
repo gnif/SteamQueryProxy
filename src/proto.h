@@ -66,8 +66,8 @@ typedef struct __attribute__((packed))
 {
   struct iphdr  ip;
   struct udphdr udp;
-  uint8_t       payload[0];
+  uint8_t payload[0];
 }
-UDPHeader;
+IPPacket;
 
 #endif

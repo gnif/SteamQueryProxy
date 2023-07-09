@@ -40,7 +40,7 @@ Stats;
 
 static Stats g_stats = {0};
 
-UDPHeader g_udpHeader;
+IPPacket g_udpHeader;
 static void initDatagram(void)
 {
   memset(&g_udpHeader, 0, sizeof(g_udpHeader));
@@ -60,9 +60,11 @@ static void sendPacket(
   uint16_t dport, uint16_t sport,
   const void * data, uint16_t len)
 {
-  char datagram[sizeof(g_udpHeader) + len];
+  // Largest safe MTU to use is 1500
+  uint8_t datagram[1500];
+
   memcpy(datagram, &g_udpHeader, sizeof(g_udpHeader));
-  UDPHeader * h = (UDPHeader *)datagram;
+  IPPacket * pkt = (IPPacket *)datagram;
 
   static atomic_int id = 0;
   uint16_t pktid =
@@ -72,16 +74,13 @@ static void sendPacket(
     sport ^
     atomic_fetch_add(&id, 1);
 
-  h->ip.id      = htons(pktid);
-  h->ip.tot_len = sizeof(g_udpHeader) + len;
-  h->ip.saddr   = saddr;
-  h->ip.daddr   = daddr;
+  pkt->ip.id      = htons(pktid);
+  pkt->ip.saddr   = saddr;
+  pkt->ip.daddr   = daddr;
 
-  h->udp.source = sport;
-  h->udp.dest   = dport;
-  h->udp.len    = htons(8 + len);
-
-  memcpy(h->payload, data, len);
+  pkt->udp.source = sport;
+  pkt->udp.dest   = dport;
+  pkt->udp.len    = htons(8 + len);
 
   struct sockaddr_in sin =
   {
@@ -90,8 +89,26 @@ static void sendPacket(
     .sin_addr.s_addr = daddr
   };
 
-  sendto(sock, h, h->ip.tot_len, 0,
-      (struct sockaddr *)&sin, sizeof(sin));
+  int offset = 0;
+  int used   = sizeof(*pkt);
+  while(len > 0)
+  {
+    int available   = sizeof(datagram) - used;
+    int payloadSize = min(len, available);
+    int packetSize  = used + payloadSize;
+
+    pkt->ip.tot_len  = htons(packetSize);
+    pkt->ip.frag_off = htons((len > available ? IP_MF : 0) | (offset >> 3));
+    memcpy(datagram + used, data, payloadSize);
+
+    sendto(sock, datagram, packetSize, 0,
+        (struct sockaddr *)&sin, sizeof(sin));
+
+    len    -= payloadSize;
+    data   += payloadSize;
+    offset += payloadSize + (offset ? 0 : sizeof(pkt->udp));
+    used    = sizeof(pkt->ip);
+  }
 }
 
 static void sendPayload(
@@ -163,7 +180,7 @@ out:
     atomic_fetch_add(&g_stats.answers, 1);
 }
 
-static void sendChallenge(int sock, UDPHeader * h)
+static void sendChallenge(int sock, IPPacket * h)
 {
   const uint32_t ch = challenge_get(h->ip.saddr ^ h->udp.dest);
   QueryMsg m =
@@ -185,10 +202,10 @@ static bool parse_payload(int sock, void * payload, uint16_t len)
   if (g_stats.enabled)
     atomic_fetch_add(&g_stats.packets, 1);
 
-  if (len < sizeof(UDPHeader) || len > MAX_RECV_SIZE)
+  if (len < sizeof(IPPacket) || len > MAX_RECV_SIZE)
     return true;
 
-  UDPHeader * h = (UDPHeader *)payload;
+  IPPacket * h = (IPPacket *)payload;
   if (h->ip.protocol != IPPROTO_UDP)
     return true;
 
