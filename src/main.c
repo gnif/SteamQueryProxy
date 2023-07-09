@@ -64,8 +64,15 @@ static void sendPacket(
   memcpy(datagram, &g_udpHeader, sizeof(g_udpHeader));
   UDPHeader * h = (UDPHeader *)datagram;
 
-  static int id = 0;
-  h->ip.id      = htonl(saddr ^ daddr ^ dport ^ sport ^ id++);
+  static atomic_int id = 0;
+  uint16_t pktid =
+    (saddr >> 16 ^ saddr) ^
+    (daddr >> 16 ^ daddr) ^
+    dport ^
+    sport ^
+    atomic_fetch_add(&id, 1);
+
+  h->ip.id      = htons(pktid);
   h->ip.tot_len = sizeof(g_udpHeader) + len;
   h->ip.saddr   = saddr;
   h->ip.daddr   = daddr;
