@@ -514,6 +514,7 @@ static void printHelp(void)
   printf(
     "Usage: SteamQueryProxy [options]\n"
     "Options:\n"
+    "  -i, --query-ip <ipv4>     The local IPv4 address the game is bound to.\n"
     "  -p, --query-port <port>   The Game Query UDP Port\n"
     "  -n, --queue-num <num>     The first netfilter queue ID\n"
     "  -t, --queue-threads <num> How many thread queues to process\n"
@@ -563,12 +564,14 @@ static void printHelp(void)
 
 int main(int argc, char *argv[])
 {
+  char       * queryIP      = NULL;
   unsigned int queryPort    = 0;
   unsigned int queueNum     = 0;
   unsigned int queueThreads = 1;
 
   struct option long_options[] =
   {
+    {"query-ip"     , required_argument, 0, 'i'},
     {"query-port"   , required_argument, 0, 'p'},
     {"queue-num"    , required_argument, 0, 'n'},
     {"queue-threads", required_argument, 0, 't'},
@@ -583,11 +586,15 @@ int main(int argc, char *argv[])
 
   int option;
   int option_index = 0;
-  while ((option = getopt_long(argc, argv, "p:n:t:gdvs:qh",
+  while ((option = getopt_long(argc, argv, "i:p:n:t:gdvs:qh",
           long_options, &option_index)) != -1)
   {
     switch(option)
     {
+      case 'i':
+        queryIP = strdup(optarg);
+        break;
+
       case 'p':
         queryPort = atoi(optarg);
         break;
@@ -643,7 +650,7 @@ int main(int argc, char *argv[])
   {
     printf("Invalid query port\n");
     printHelp();
-    exit(EXIT_FAILURE);
+    return 1;
   }
 
   srand(time(NULL));
@@ -652,7 +659,7 @@ int main(int argc, char *argv[])
   initDatagram();
 
   challenge_init();
-  client_start("127.0.0.1", queryPort, g_goldSource, true);
+  client_start(queryIP ? queryIP : "127.0.0.1", queryPort, g_goldSource, true);
 
   /* wait until we have all the information needed to operate */
   while(client_isReady())
@@ -692,5 +699,6 @@ int main(int argc, char *argv[])
     pthread_join(t[i], NULL);
 
   client_stop();
+  free(queryIP);
   return 0;
 }
