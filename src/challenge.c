@@ -1,4 +1,5 @@
 #include "challenge.h"
+#include "util.h"
 
 #include <stdlib.h>
 
@@ -37,11 +38,10 @@ bool challenge_validate(uint32_t challenge, uint32_t mutate)
   if (challenge == 0 || challenge == 0xFFFFFFFF)
     return false;
 
-  challenge ^= mutate;
   int index = g_challengeIndex;
   for(int i = 0; i < g_nChallenges; ++i)
   {
-    if (g_challenges[index] == challenge)
+    if (jenkinsHash(g_challenges[index], mutate) == challenge)
       return true;
 
     if (++index == g_nChallenges)
@@ -53,5 +53,5 @@ bool challenge_validate(uint32_t challenge, uint32_t mutate)
 
 uint32_t challenge_get(uint32_t mutate)
 {
-  return g_challenges[g_challengeIndex] ^ mutate;
+  return jenkinsHash(g_challenges[g_challengeIndex], mutate);
 }
