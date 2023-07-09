@@ -349,6 +349,12 @@ void client_start(const char * ip, unsigned int queryPort, bool goldSource,
   for(int i = 0; i < PT_MAX; ++i)
     rwlock_init(&g_cache[i].lock);
 
+  if (!g_quiet)
+    printf("Upstream: %s:%d (Protocol: %sSource)\n",
+        ip,
+        queryPort,
+        goldSource ? "Gold" : "");
+
   if (threaded)
     pthread_create(&qt, NULL, clientThread, NULL);
   else
