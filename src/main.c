@@ -6,6 +6,7 @@
 #include "challenge.h"
 
 #include <getopt.h>
+#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -653,7 +654,21 @@ int main(int argc, char *argv[])
     return 1;
   }
 
-  srand(time(NULL));
+  int fd = open("/dev/urandom", O_RDONLY);
+  if (fd == -1)
+  {
+    fprintf(stderr, "Failed to open /dev/urandom\n");
+    return 1;
+  }
+
+  unsigned int seed;
+  if (read(fd, &seed, sizeof(seed) != sizeof(seed)))
+  {
+    fprintf(stderr, "Failed to read from /dev/urandom\n");
+    return 1;
+  }
+  close(fd);
+  srand(seed);
 
   /* initialie the UDP datagram */
   initDatagram();
